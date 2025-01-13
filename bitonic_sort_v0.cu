@@ -5,28 +5,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+__device__ void swap(int *arr, int i, int j) {
+    int temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+}
+
 __global__ void exchange(int *arr, int size, int distance, int group_size) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    int partner = tid ^ distance;
-    if (partner > tid) {
-        if ((tid & group_size) == 0 && arr[tid] > arr[partner]) {
-            int temp = arr[tid];
-            arr[tid] = arr[partner];
-            arr[partner] = temp;
-        }
-        if ((tid & group_size) != 0 && arr[tid] < arr[partner]) {
-            int temp = arr[tid];
-            arr[tid] = arr[partner];
-            arr[partner] = temp;
-        }
+    int i = (tid / distance) * distance * 2 + (tid % distance);
+    int partner = i ^ distance;
+
+    if ((i & group_size) == 0 && arr[i] > arr[partner]) {
+        swap(arr, i, partner);
+    }
+    if ((i & group_size) != 0 && arr[i] < arr[partner]) {
+        swap(arr, i, partner);
     }
 }
 
 int main() {
-    int n = 2048;
+    int n = 1 << 15;
     int num_threads = 1024;
-    int num_blocks = n / num_threads;
+    int num_blocks = n / (2 * num_threads);
 
     int *arr = (int *)malloc(n * sizeof(int));
     int *out = (int *)malloc(n * sizeof(int));
@@ -47,6 +49,11 @@ int main() {
     }
 
     cudaMemcpy(out, d_arr, n * sizeof(int), cudaMemcpyDeviceToHost);
+
+    // for (int i = 0; i < n; i++) {
+    //     if (i % 1024 == 0) printf("\n\n");
+    //     printf("%d ", out[i]);
+    // }
 
     for (int i = 1; i < n; i++) {
         assert(out[i - 1] <= out[i]);
