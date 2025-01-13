@@ -27,23 +27,16 @@ __global__ void exchange(int *arr, int size, int distance, int group_size) {
 
 __global__ void initialExchangeLocally(int *arr, int size) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    bool sort_descending = blockIdx.x & 1;
 
-    for (int group_size = 2; group_size <= size; group_size <<= 1) {
+    for (int group_size = 2; group_size <= 1024; group_size <<= 1) {
         for (int distance = group_size >> 1; distance > 0; distance >>= 1) {
             int partner = tid ^ distance;
             if (partner > tid) {
-                if (group_size == 1024 && sort_descending) {
-                    if (arr[tid] < arr[partner]) {
-                        swap(arr, tid, partner);
-                    }
-                } else {
-                    if ((tid & group_size) == 0 && arr[tid] > arr[partner]) {
-                        swap(arr, tid, partner);
-                    }
-                    if ((tid & group_size) != 0 && arr[tid] < arr[partner]) {
-                        swap(arr, tid, partner);
-                    }
+                if ((tid & group_size) == 0 && arr[tid] > arr[partner]) {
+                    swap(arr, tid, partner);
+                }
+                if ((tid & group_size) != 0 && arr[tid] < arr[partner]) {
+                    swap(arr, tid, partner);
                 }
             }
             __syncthreads();
@@ -54,7 +47,7 @@ __global__ void initialExchangeLocally(int *arr, int size) {
 __global__ void exchangeLocally(int *arr, int group_size) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int distance = 1024 >> 1; distance > 0; distance >>= 1) {
+    for (int distance = 512; distance > 0; distance >>= 1) {
         int partner = tid ^ distance;
         if (partner > tid) {
             if ((tid & group_size) == 0 && arr[tid] > arr[partner]) {
