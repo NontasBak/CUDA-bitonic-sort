@@ -25,18 +25,23 @@ __global__ void exchange(int *arr, int size, int distance, int group_size) {
     }
 }
 
-__global__ void initialExchangeLocally(int *arr, int size) {
+__global__ void initialExchangeLocally(int *arr) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int group_size = 2; group_size <= 1024; group_size <<= 1) {
+    for (int group_size = 2; group_size <= 2048; group_size <<= 1) {
         for (int distance = group_size >> 1; distance > 0; distance >>= 1) {
-            int partner = tid ^ distance;
-            if (partner > tid) {
-                if ((tid & group_size) == 0 && arr[tid] > arr[partner]) {
-                    swap(arr, tid, partner);
-                }
-                if ((tid & group_size) != 0 && arr[tid] < arr[partner]) {
-                    swap(arr, tid, partner);
+            int start_index_i = tid + blockDim.x * blockIdx.x;
+            int end_index_i = start_index_i + blockDim.x;
+
+            for (int i = start_index_i; i <= end_index_i; i += 1024) {
+                int partner = i ^ distance;
+                if (partner > i) {
+                    if ((i & group_size) == 0 && arr[i] > arr[partner]) {
+                        swap(arr, i, partner);
+                    }
+                    if ((i & group_size) != 0 && arr[i] < arr[partner]) {
+                        swap(arr, i, partner);
+                    }
                 }
             }
             __syncthreads();
@@ -47,14 +52,19 @@ __global__ void initialExchangeLocally(int *arr, int size) {
 __global__ void exchangeLocally(int *arr, int group_size) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int distance = 512; distance > 0; distance >>= 1) {
-        int partner = tid ^ distance;
-        if (partner > tid) {
-            if ((tid & group_size) == 0 && arr[tid] > arr[partner]) {
-                swap(arr, tid, partner);
-            }
-            if ((tid & group_size) != 0 && arr[tid] < arr[partner]) {
-                swap(arr, tid, partner);
+    for (int distance = 1024; distance > 0; distance >>= 1) {
+        int start_index_i = tid + blockDim.x * blockIdx.x;
+        int end_index_i = start_index_i + blockDim.x;
+
+        for (int i = start_index_i; i <= end_index_i; i += 1024) {
+            int partner = i ^ distance;
+            if (partner > i) {
+                if ((i & group_size) == 0 && arr[i] > arr[partner]) {
+                    swap(arr, i, partner);
+                }
+                if ((i & group_size) != 0 && arr[i] < arr[partner]) {
+                    swap(arr, i, partner);
+                }
             }
         }
         __syncthreads();
@@ -62,9 +72,10 @@ __global__ void exchangeLocally(int *arr, int group_size) {
 }
 
 int main() {
-    int n = 1 << 13;
+    int n = 1 << 25;
     int num_threads = 1 << 10;
-    int num_blocks = n / num_threads;
+    int num_blocks = n / (2 * num_threads);
+    int num_blocks_exch = n / num_threads;
 
     int *arr = (int *)malloc(n * sizeof(int));
     int *out = (int *)malloc(n * sizeof(int));
@@ -77,11 +88,18 @@ int main() {
     cudaMalloc(&d_arr, n * sizeof(int));
     cudaMemcpy(d_arr, arr, n * sizeof(int), cudaMemcpyHostToDevice);
 
-    initialExchangeLocally<<<num_blocks, num_threads>>>(d_arr, 1 << 10);
+    initialExchangeLocally<<<num_blocks, num_threads>>>(d_arr);
+    // cudaDeviceSynchronize();
 
-    for (int group_size = 2048; group_size <= n; group_size <<= 1) {
-        for (int distance = group_size >> 1; distance > 512; distance >>= 1) {
-            exchange<<<num_blocks, num_threads>>>(d_arr, n, distance,
+    // cudaMemcpy(out, d_arr, n * sizeof(int), cudaMemcpyDeviceToHost);
+    // for (int i = 0; i < n; i++) {
+    //     if (i % 1024 == 0) printf("\n\n");
+    //     printf("%d ", out[i]);
+    // }
+
+    for (int group_size = 4096; group_size <= n; group_size <<= 1) {
+        for (int distance = group_size >> 1; distance > 1024; distance >>= 1) {
+            exchange<<<num_blocks_exch, num_threads>>>(d_arr, n, distance,
                                                   group_size);
         }
         exchangeLocally<<<num_blocks, num_threads>>>(d_arr, group_size);
