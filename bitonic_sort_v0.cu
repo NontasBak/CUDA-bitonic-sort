@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 
 __device__ void swap(int *arr, int i, int j) {
     int temp = arr[i];
@@ -26,12 +27,11 @@ __global__ void exchange(int *arr, int size, int distance, int group_size) {
 }
 
 int main() {
-    int n = 1 << 15;
+    int n = 1 << 23;
     int num_threads = 1024;
     int num_blocks = n / (2 * num_threads);
 
     int *arr = (int *)malloc(n * sizeof(int));
-    int *out = (int *)malloc(n * sizeof(int));
     int *d_arr;
 
     for (int i = 0; i < n; i++) {
@@ -41,6 +41,8 @@ int main() {
     cudaMalloc(&d_arr, n * sizeof(int));
     cudaMemcpy(d_arr, arr, n * sizeof(int), cudaMemcpyHostToDevice);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     for (int group_size = 2; group_size <= n; group_size <<= 1) {
         for (int distance = group_size >> 1; distance > 0; distance >>= 1) {
             exchange<<<num_blocks, num_threads>>>(d_arr, n, distance,
@@ -48,7 +50,11 @@ int main() {
         }
     }
 
-    cudaMemcpy(out, d_arr, n * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr, d_arr, n * sizeof(int), cudaMemcpyDeviceToHost);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+    printf("Execution time: %f seconds\n", duration.count());
 
     // for (int i = 0; i < n; i++) {
     //     if (i % 1024 == 0) printf("\n\n");
@@ -56,15 +62,12 @@ int main() {
     // }
 
     for (int i = 1; i < n; i++) {
-        assert(out[i - 1] <= out[i]);
+        assert(arr[i - 1] <= arr[i]);
     }
-
     printf("PASSED\n");
 
     cudaFree(d_arr);
-
     free(arr);
-    free(out);
 
     return 0;
 }
