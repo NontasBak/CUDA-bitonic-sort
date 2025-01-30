@@ -103,6 +103,15 @@ int main(int argc, char *argv[]) {
     printf("Total time (including malloc): %f seconds\n", total_time);
     printf("Execution time (excluding malloc): %f seconds\n", execution_time);
 
+    // // Print final result
+    // printf("\nFinal array:\n");
+    // for (int i = 0; i < n; i++) {
+    //     if (i % 1024 == 0) {
+    //         printf("\n");
+    //     }
+    //     printf("%d ", arr[i]);
+    // }
+
     // Verification
     for (int i = 1; i < n; i++) {
         assert(arr[i - 1] <= arr[i]);
