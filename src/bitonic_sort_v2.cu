@@ -29,7 +29,7 @@ __global__ void initialExchangeLocally(int *arr) {
     int t = threadIdx.x;
     int tid = blockIdx.x * blockDim.x + t;
 
-    int offset = blockIdx.x * blockDim.x * 2;
+    int offset = blockIdx.x * blockDim.x * 2; // 0, 2048, 4096, ...
 
     // Transfer data to shared memory
     __shared__ int shared_arr[2048];
@@ -63,7 +63,7 @@ __global__ void exchangeLocally(int *arr, int group_size) {
     int t = threadIdx.x;
     int tid = blockIdx.x * blockDim.x + t;
 
-    int offset = blockIdx.x * blockDim.x * 2;
+    int offset = blockIdx.x * blockDim.x * 2; // 0, 2048, 4096, ...
 
     // Transfer data to shared memory
     __shared__ int shared_arr[2048];
